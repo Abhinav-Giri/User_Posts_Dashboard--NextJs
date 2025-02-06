@@ -1,101 +1,131 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {  usePosts } from '../hooks/usePosts';
+import { useUsers } from '../hooks/useUsers';
+
+import { postService } from '@/services/api';
+import { EditPostDialog } from '@/components/dashboard/EditPostDialog';
+import { Button } from '@/components/ui/button';
+import { Post, User } from '../types/index';
+
+const queryClient = new QueryClient();
+
+const Dashboard: React.FC = () => {
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: users, isLoading: usersLoading } = useUsers();
+  const { 
+    data: postsPages, 
+    fetchNextPage, 
+    hasNextPage 
+  } = usePosts(selectedUserId);
+
+  const handleUpdatePost = async (updatedPost: Post) => {
+    try {
+      await postService.updatePost(updatedPost);
+      queryClient.invalidateQueries({ queryKey: ['posts', selectedUserId] });
+      setEditingPost(null);
+    } catch (error) {
+      console.error('Failed to update post', error);
+    }
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    try {
+      await postService.deletePost(postId);
+      queryClient.invalidateQueries({ queryKey: ['posts', selectedUserId] });
+    } catch (error) {
+      console.error('Failed to delete post', error);
+    }
+  };
+
+  const filteredUsers = users?.filter(user => 
+    user.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const allPosts = postsPages?.pages.flat() || [];
+
+  return (
+    <div className="container mx-auto p-4">
+      <input
+        type="text"
+        placeholder="Search users..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full p-2 mb-4 border"
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Users List */}
+        <div className="space-y-2">
+          {filteredUsers?.map(user => (
+            <div 
+              key={user.id} 
+              onClick={() => setSelectedUserId(user.id)}
+              className={`p-4 border rounded cursor-pointer ${
+                selectedUserId === user.id ? 'bg-blue-100' : ''
+              }`}
+            >
+              <h3 className="font-bold">{user.name}</h3>
+              <p>{user.email}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Posts List */}
+        <div className="md:col-span-2">
+          {selectedUserId && (
+            <div>
+              <h2 className="text-2xl mb-4">Posts</h2>
+              {allPosts.map(post => (
+                <div key={post.id} className="border p-4 mb-2">
+                  <h3 className="font-bold">{post.title}</h3>
+                  <p>{post.body}</p>
+                  <div className="mt-2 space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setEditingPost(post)}
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleDeletePost(post.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {hasNextPage && (
+                <Button onClick={() => fetchNextPage()}>
+                  Load More Posts
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editingPost && (
+        <EditPostDialog
+          post={editingPost}
+          onSave={handleUpdatePost}
+          onClose={() => setEditingPost(null)}
+        />
+      )}
+    </div>
+  );
+};
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <Dashboard />
+    </QueryClientProvider>
   );
 }
